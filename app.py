@@ -32,12 +32,12 @@ st.markdown("Limpia y normaliza tu base de datos chilena en segundos")
 st.divider()
 
 # ── Navegación por pestañas ────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab5, tab1, tab2, tab3, tab4 = st.tabs([
+    "🩺 Diagnóstico Gratuito",
     "🪪 RUT & Direcciones",
-    "📱 Teléfonos", 
+    "📱 Teléfonos",
     "📧 Emails",
-    "📊 RFM Analytics",
-    "🩺 Diagnóstico Gratuito"
+    "💡 Inteligencia de Clientes",
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -381,7 +381,7 @@ with tab3:
 # PESTAÑA 4 — RFM Analytics
 # ══════════════════════════════════════════════════════════════
 with tab4:
-    st.subheader("📊 RFM Analytics — Inteligencia de Clientes")
+    st.subheader("💡 Inteligencia de Clientes")
     st.markdown("""
     <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
         <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
