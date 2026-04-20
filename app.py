@@ -4,6 +4,7 @@ import phonenumbers
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from utils.supabase_client import registrar_usuario, login_usuario, obtener_creditos, descontar_creditos
 from email_validator import validate_email, EmailNotValidError
 from modules.rut import validar_rut
 from modules.direcciones import parsear_direccion
@@ -12,6 +13,45 @@ from modules.deduplicacion import detectar_duplicados
 
 # ── Configuración ──────────────────────────────────────────────
 st.set_page_config(page_title="DatoFiel", page_icon="logo.png", layout="wide")
+# ── Sesión ─────────────────────────────────────────────────────
+if "usuario" not in st.session_state:
+    st.session_state.usuario = None
+
+def cerrar_sesion():
+    st.session_state.usuario = None
+    st.rerun()
+
+# ── Login / Registro (opcional) ────────────────────────────────
+if not st.session_state.usuario:
+    with st.sidebar:
+        st.markdown("### 🔐 Iniciar sesión")
+        st.caption("Requerido para Inteligencia de Clientes y Procesador de Pedidos")
+        modo = st.radio("", ["Iniciar sesión", "Registrarse"], horizontal=True, key="modo_auth")
+        with st.form("form_auth"):
+            email    = st.text_input("Email")
+            password = st.text_input("Contraseña", type="password")
+            submit   = st.form_submit_button("Entrar" if modo == "Iniciar sesión" else "Crear cuenta")
+            if submit:
+                if not email or not password:
+                    st.error("Completa todos los campos")
+                elif modo == "Iniciar sesión":
+                    result = login_usuario(email, password)
+                    if result["ok"]:
+                        st.session_state.usuario = result["usuario"]
+                        st.rerun()
+                    else:
+                        st.error(result["error"])
+                else:
+                    if len(password) < 6:
+                        st.error("La contraseña debe tener al menos 6 caracteres")
+                    else:
+                        result = registrar_usuario(email, password)
+                        if result["ok"]:
+                            st.session_state.usuario = result["usuario"]
+                            st.success("✅ Cuenta creada — tienes 50 créditos gratis")
+                            st.rerun()
+                        else:
+                            st.error(result["error"])
 
 st.markdown("""
 <style>
@@ -29,19 +69,26 @@ st.markdown("""
 # ── Header ─────────────────────────────────────────────────────
 st.image("logo.png", width=200)
 st.markdown("Limpia y normaliza tu base de datos chilena en segundos")
+
+if st.session_state.usuario:
+    with st.sidebar:
+        st.markdown(f"**{st.session_state.usuario['email']}**")
+        creditos = obtener_creditos(st.session_state.usuario["id"])
+        st.metric("💳 Créditos", creditos)
+        if st.button("Cerrar sesión", key="logout"):
+            cerrar_sesion()
 st.divider()
 
 # ── Navegación por pestañas ────────────────────────────────────
-tab5, tab1, tab2, tab3, tab4, tab6, tab7 = st.tabs([
+tab5, tab6, tab1, tab2, tab3, tab4, tab7 = st.tabs([
     "🩺 Diagnóstico Gratuito",
+    "🔄 Conversor de Formatos",
     "🪪 RUT & Direcciones",
     "📱 Teléfonos",
     "📧 Emails",
     "💡 Inteligencia de Clientes",
-    "🔄 Conversor de Formatos",
     "📦 Procesador de Pedidos",
 ])
-
 # ══════════════════════════════════════════════════════════════
 # PESTAÑA 1 — RUT & Direcciones
 # ══════════════════════════════════════════════════════════════
@@ -401,124 +448,148 @@ with tab4:
         </div>
     </div>
     """, unsafe_allow_html=True)
-    st.caption("Sube un historial de ventas y descubre quiénes son tus mejores clientes")
 
-    uploaded4 = st.file_uploader("Sube tu archivo", type=["csv", "xlsx"], key="up4")
+    if not st.session_state.usuario:
+        st.markdown("### 🔐 Requiere cuenta gratuita")
+        st.markdown("Regístrate y recibe **50 créditos** para empezar — sin tarjeta de crédito.")
+        st.info("👈 Regístrate en el panel lateral")
+    else:
+        st.subheader("💡 Inteligencia de Clientes")
+        st.markdown("""
+        <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+            <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+                <div style='flex:1; min-width:200px'>
+                    <p style='color:#cdd6f4'>Transforma tu historial de ventas en inteligencia de clientes. Identifica automáticamente quiénes son tus mejores clientes y quiénes estás a punto de perder.</p>
+                    <p style='color:#a6adc8; font-size:0.85rem'>📅 Recencia &nbsp;|&nbsp; 🔁 Frecuencia &nbsp;|&nbsp; 💰 Monto &nbsp;|&nbsp; Solo necesitas 3 columnas</p>
+                </div>
+                <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#a6e3a1'>🏆 Campeón &nbsp;&nbsp;→ Compra seguido, gasta mucho</div>
+                <div style='color:#89b4fa; margin-top:6px'>💛 Leal &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ Compra frecuente</div>
+                <div style='color:#a6e3a1; margin-top:6px'>🌱 Potencial &nbsp;→ Reciente, poco frecuente</div>
+                <div style='color:#f9e2af; margin-top:6px'>⚠️ En Riesgo &nbsp;→ No compra hace tiempo</div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ Perdido &nbsp;&nbsp;&nbsp;→ Inactivo hace mucho</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.caption("Sube un historial de ventas y descubre quiénes son tus mejores clientes")
 
-    if uploaded4:
-        df4 = pd.read_csv(uploaded4) if uploaded4.name.endswith('.csv') else pd.read_excel(uploaded4)
-        st.success(f"✅ {len(df4):,} registros cargados")
+        uploaded4 = st.file_uploader("Sube tu archivo", type=["csv", "xlsx"], key="up4")
 
-        with st.expander("👁️ Vista previa", expanded=False):
-            st.dataframe(df4.head(), use_container_width=True)
+        if uploaded4:
+            df4 = pd.read_csv(uploaded4) if uploaded4.name.endswith('.csv') else pd.read_excel(uploaded4)
+            st.success(f"✅ {len(df4):,} registros cargados")
 
-        st.markdown("#### 🗂️ Mapea tus columnas")
+            with st.expander("👁️ Vista previa", expanded=False):
+                st.dataframe(df4.head(), use_container_width=True)
 
-        KEYWORDS_ID     = ["id", "cliente", "rut", "customer", "cod"]
-        KEYWORDS_FECHA  = ["fecha", "date", "compra", "venta", "order"]
-        KEYWORDS_MONTO  = ["monto", "total", "valor", "amount", "precio", "venta"]
+            st.markdown("#### 🗂️ Mapea tus columnas")
 
-        col_id_det    = next((c for c in df4.columns if any(k in c.lower() for k in KEYWORDS_ID)), df4.columns[0])
-        col_fecha_det = next((c for c in df4.columns if any(k in c.lower() for k in KEYWORDS_FECHA)), df4.columns[0])
-        col_monto_det = next((c for c in df4.columns if any(k in c.lower() for k in KEYWORDS_MONTO)), df4.columns[0])
+            KEYWORDS_ID     = ["id", "cliente", "rut", "customer", "cod"]
+            KEYWORDS_FECHA  = ["fecha", "date", "compra", "venta", "order"]
+            KEYWORDS_MONTO  = ["monto", "total", "valor", "amount", "precio", "venta"]
 
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown('**ID Cliente** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
-            col_id = st.selectbox("", df4.columns, index=list(df4.columns).index(col_id_det), key="rfm_id", label_visibility="collapsed")
-        with c2:
-            st.markdown('**Fecha Compra** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
-            col_fecha = st.selectbox("", df4.columns, index=list(df4.columns).index(col_fecha_det), key="rfm_fecha", label_visibility="collapsed")
-        with c3:
-            st.markdown('**Monto** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
-            col_monto = st.selectbox("", df4.columns, index=list(df4.columns).index(col_monto_det), key="rfm_monto", label_visibility="collapsed")
+            col_id_det    = next((c for c in df4.columns if any(k in c.lower() for k in KEYWORDS_ID)), df4.columns[0])
+            col_fecha_det = next((c for c in df4.columns if any(k in c.lower() for k in KEYWORDS_FECHA)), df4.columns[0])
+            col_monto_det = next((c for c in df4.columns if any(k in c.lower() for k in KEYWORDS_MONTO)), df4.columns[0])
 
-        if st.button("📊 Calcular RFM", key="btn4"):
-            with st.spinner("Calculando segmentos..."):
-                df4[col_fecha] = pd.to_datetime(df4[col_fecha], dayfirst=True, errors='coerce')
-                fecha_max = df4[col_fecha].max()
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown('**ID Cliente** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
+                col_id = st.selectbox("", df4.columns, index=list(df4.columns).index(col_id_det), key="rfm_id", label_visibility="collapsed")
+            with c2:
+                st.markdown('**Fecha Compra** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
+                col_fecha = st.selectbox("", df4.columns, index=list(df4.columns).index(col_fecha_det), key="rfm_fecha", label_visibility="collapsed")
+            with c3:
+                st.markdown('**Monto** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
+                col_monto = st.selectbox("", df4.columns, index=list(df4.columns).index(col_monto_det), key="rfm_monto", label_visibility="collapsed")
 
-                rfm = df4.groupby(col_id).agg(
-                    Recencia   = (col_fecha, lambda x: (fecha_max - x.max()).days),
-                    Frecuencia = (col_id, 'count'),
-                    Monto      = (col_monto, 'sum')
-                ).reset_index()
+            if st.button("📊 Calcular RFM", key="btn4"):
+                with st.spinner("Calculando segmentos..."):
+                    df4[col_fecha] = pd.to_datetime(df4[col_fecha], dayfirst=True, errors='coerce')
+                    fecha_max = df4[col_fecha].max()
 
-                # Scoring por percentiles
-                def score_percentil(serie, inverso=False):
-                    pct = serie.rank(pct=True)
-                    if inverso:
-                        pct = 1 - pct
-                    return pd.cut(pct, bins=4, labels=[1,2,3,4]).astype(int)
+                    rfm = df4.groupby(col_id).agg(
+                        Recencia   = (col_fecha, lambda x: (fecha_max - x.max()).days),
+                        Frecuencia = (col_id, 'count'),
+                        Monto      = (col_monto, 'sum')
+                    ).reset_index()
 
-                rfm['R'] = score_percentil(rfm['Recencia'],   inverso=True)
-                rfm['F'] = score_percentil(rfm['Frecuencia'], inverso=False)
-                rfm['M'] = score_percentil(rfm['Monto'],      inverso=False)
-                rfm['RFM_Score'] = rfm['R'] + rfm['F'] + rfm['M']
+                    # Scoring por percentiles
+                    def score_percentil(serie, inverso=False):
+                        pct = serie.rank(pct=True)
+                        if inverso:
+                            pct = 1 - pct
+                        return pd.cut(pct, bins=4, labels=[1,2,3,4]).astype(int)
 
-                def segmentar(score):
-                    if score >= 11: return '🏆 Campeón'
-                    elif score >= 9: return '💛 Leal'
-                    elif score >= 7: return '🌱 Potencial'
-                    elif score >= 5: return '⚠️ En Riesgo'
-                    else: return '❌ Perdido'
+                    rfm['R'] = score_percentil(rfm['Recencia'],   inverso=True)
+                    rfm['F'] = score_percentil(rfm['Frecuencia'], inverso=False)
+                    rfm['M'] = score_percentil(rfm['Monto'],      inverso=False)
+                    rfm['RFM_Score'] = rfm['R'] + rfm['F'] + rfm['M']
 
-                rfm['Segmento'] = rfm['RFM_Score'].apply(segmentar)
+                    def segmentar(score):
+                        if score >= 11: return '🏆 Campeón'
+                        elif score >= 9: return '💛 Leal'
+                        elif score >= 7: return '🌱 Potencial'
+                        elif score >= 5: return '⚠️ En Riesgo'
+                        else: return '❌ Perdido'
 
-            # Métricas
-            st.divider()
-            segmentos = rfm['Segmento'].value_counts()
-            m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("🏆 Campeones",   segmentos.get('🏆 Campeón', 0))
-            m2.metric("💛 Leales",      segmentos.get('💛 Leal', 0))
-            m3.metric("🌱 Potenciales", segmentos.get('🌱 Potencial', 0))
-            m4.metric("⚠️ En Riesgo",  segmentos.get('⚠️ En Riesgo', 0))
-            m5.metric("❌ Perdidos",    segmentos.get('❌ Perdido', 0))
+                    rfm['Segmento'] = rfm['RFM_Score'].apply(segmentar)
 
-            # Gráficos
-            st.divider()
-            g1, g2 = st.columns(2)
+                # Métricas
+                st.divider()
+                segmentos = rfm['Segmento'].value_counts()
+                m1, m2, m3, m4, m5 = st.columns(5)
+                m1.metric("🏆 Campeones",   segmentos.get('🏆 Campeón', 0))
+                m2.metric("💛 Leales",      segmentos.get('💛 Leal', 0))
+                m3.metric("🌱 Potenciales", segmentos.get('🌱 Potencial', 0))
+                m4.metric("⚠️ En Riesgo",  segmentos.get('⚠️ En Riesgo', 0))
+                m5.metric("❌ Perdidos",    segmentos.get('❌ Perdido', 0))
 
-            with g1:
-                fig_pie = px.pie(
-                    rfm, names='Segmento',
-                    title='Distribución de Segmentos',
+                # Gráficos
+                st.divider()
+                g1, g2 = st.columns(2)
+
+                with g1:
+                    fig_pie = px.pie(
+                        rfm, names='Segmento',
+                        title='Distribución de Segmentos',
+                        color_discrete_sequence=px.colors.qualitative.Set3
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+                with g2:
+                    fig_bar = px.bar(
+                        rfm.groupby('Segmento')['Monto'].sum().reset_index(),
+                        x='Segmento', y='Monto',
+                        title='Ingresos por Segmento',
+                        color='Segmento',
+                        color_discrete_sequence=px.colors.qualitative.Set3
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                # Scatter RFM
+                fig_scatter = px.scatter(
+                    rfm, x='Recencia', y='Frecuencia', size='Monto',
+                    color='Segmento', hover_data=[col_id],
+                    title='Mapa RFM — Recencia vs Frecuencia (tamaño = Monto)',
                     color_discrete_sequence=px.colors.qualitative.Set3
                 )
-                st.plotly_chart(fig_pie, use_container_width=True)
+                st.plotly_chart(fig_scatter, use_container_width=True)
 
-            with g2:
-                fig_bar = px.bar(
-                    rfm.groupby('Segmento')['Monto'].sum().reset_index(),
-                    x='Segmento', y='Monto',
-                    title='Ingresos por Segmento',
-                    color='Segmento',
-                    color_discrete_sequence=px.colors.qualitative.Set3
-                )
-                st.plotly_chart(fig_bar, use_container_width=True)
+                st.dataframe(rfm, use_container_width=True)
 
-            # Scatter RFM
-            fig_scatter = px.scatter(
-                rfm, x='Recencia', y='Frecuencia', size='Monto',
-                color='Segmento', hover_data=[col_id],
-                title='Mapa RFM — Recencia vs Frecuencia (tamaño = Monto)',
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
-            st.plotly_chart(fig_scatter, use_container_width=True)
-
-            st.dataframe(rfm, use_container_width=True)
-
-            d1, d2 = st.columns(2)
-            with d1:
-                en_riesgo = rfm[rfm['Segmento'] == '⚠️ En Riesgo']
-                st.download_button("⬇️ Descargar clientes En Riesgo",
-                    en_riesgo.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
-                    "clientes_en_riesgo.csv", "text/csv",
-                    use_container_width=True, type="primary")
-            with d2:
-                st.download_button("⬇️ Descargar RFM completo",
-                    rfm.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
-                    "rfm_completo.csv", "text/csv", use_container_width=True)
+                d1, d2 = st.columns(2)
+                with d1:
+                    en_riesgo = rfm[rfm['Segmento'] == '⚠️ En Riesgo']
+                    st.download_button("⬇️ Descargar clientes En Riesgo",
+                        en_riesgo.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+                        "clientes_en_riesgo.csv", "text/csv",
+                        use_container_width=True, type="primary")
+                with d2:
+                    st.download_button("⬇️ Descargar RFM completo",
+                        rfm.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+                        "rfm_completo.csv", "text/csv", use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════
 # PESTAÑA 5 — Diagnóstico Gratuito
@@ -777,107 +848,132 @@ with tab7:
     </div>
     """, unsafe_allow_html=True)
 
-    # Formatos requeridos por cada courier
-    FORMATOS_COURIER = {
-        "Starken": ["NOMBRE_DEST", "DIRECCION", "COMUNA_DEST", "CIUDAD_DEST", "FONO_DEST", "EMAIL_DEST", "DESC_CONTENIDO", "PESO_KG", "ALTO_CM", "ANCHO_CM", "LARGO_CM", "VALOR_DECLARADO"],
-        "Chilexpress": ["nombre_destinatario", "direccion_destino", "comuna_destino", "telefono_contacto", "email_contacto", "descripcion_producto", "peso_kg", "valor_declarado"],
-        "Blue Express": ["Destinatario", "Dirección", "Comuna", "Ciudad", "Teléfono", "Email", "Descripción", "Peso", "Valor"],
-    }
+    if not st.session_state.usuario:
+        st.markdown("### 🔐 Requiere cuenta gratuita")
+        st.markdown("Regístrate y recibe **50 créditos** para empezar — sin tarjeta de crédito.")
+        st.info("👈 Regístrate en el panel lateral")
+    else:
+        st.subheader("📦 Procesador de Pedidos")
+        st.markdown("""
+        <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+            <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+                <div style='flex:1; min-width:200px'>
+                    <p style='color:#cdd6f4'>Transforma tu planilla de pedidos al formato exacto que requieren Starken, Chilexpress y Blue Express. Elimina el trabajo manual de reformatear datos para cada courier.</p>
+                    <p style='color:#a6adc8; font-size:0.85rem'>🚚 Starken &nbsp;|&nbsp; 📬 Chilexpress &nbsp;|&nbsp; 💨 Blue Express &nbsp;|&nbsp; PDF + Excel</p>
+                </div>
+                <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                    <div style='color:#cdd6f4'>Tu planilla &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ Formato courier</div>
+                    <div style='color:#a6adc8; margin-top:6px'>nombre &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ NOMBRE_DEST</div>
+                    <div style='color:#a6adc8; margin-top:4px'>direccion &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ DIRECCION</div>
+                    <div style='color:#a6adc8; margin-top:4px'>comuna &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ COMUNA_DEST</div>
+                    <div style='color:#a6adc8; margin-top:4px'>telefono &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ FONO_DEST</div>
+                    <div style='color:#a6adc8; margin-top:4px'>producto &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ DESC_CONTENIDO</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    courier = st.selectbox("Selecciona el courier", list(FORMATOS_COURIER.keys()), key="courier")
-    st.caption(f"Columnas requeridas por {courier}: `{'`, `'.join(FORMATOS_COURIER[courier])}`")
-
-    uploaded7 = st.file_uploader("Sube tu planilla de pedidos", type=["csv", "xlsx"], key="up7")
-
-    if uploaded7:
-        df7 = pd.read_csv(uploaded7) if uploaded7.name.endswith('.csv') else pd.read_excel(uploaded7)
-        st.success(f"✅ {len(df7):,} pedidos cargados")
-
-        with st.expander("👁️ Vista previa", expanded=False):
-            st.dataframe(df7.head(), use_container_width=True)
-
-        st.divider()
-        st.markdown(f"#### 🗂️ Mapea tus columnas al formato {courier}")
-        st.caption("Selecciona qué columna de tu archivo corresponde a cada campo requerido")
-
-        columnas_requeridas = FORMATOS_COURIER[courier]
-        KEYWORDS_COURIER = {
-            "NOMBRE_DEST": ["nombre", "name", "destinatario", "cliente"],
-            "nombre_destinatario": ["nombre", "name", "destinatario", "cliente"],
-            "Destinatario": ["nombre", "name", "destinatario", "cliente"],
-            "DIRECCION": ["direccion", "dirección", "address", "calle"],
-            "direccion_destino": ["direccion", "dirección", "address", "calle"],
-            "Dirección": ["direccion", "dirección", "address", "calle"],
-            "COMUNA_DEST": ["comuna", "city", "ciudad"],
-            "comuna_destino": ["comuna", "city", "ciudad"],
-            "Comuna": ["comuna", "city", "ciudad"],
-            "CIUDAD_DEST": ["ciudad", "city", "region"],
-            "Ciudad": ["ciudad", "city", "region"],
-            "FONO_DEST": ["telefono", "fono", "phone", "celular"],
-            "telefono_contacto": ["telefono", "fono", "phone", "celular"],
-            "Teléfono": ["telefono", "fono", "phone", "celular"],
-            "EMAIL_DEST": ["email", "correo", "mail"],
-            "email_contacto": ["email", "correo", "mail"],
-            "Email": ["email", "correo", "mail"],
-            "DESC_CONTENIDO": ["producto", "descripcion", "item", "contenido"],
-            "descripcion_producto": ["producto", "descripcion", "item", "contenido"],
-            "Descripción": ["producto", "descripcion", "item", "contenido"],
-            "PESO_KG": ["peso", "weight", "kg"],
-            "peso_kg": ["peso", "weight", "kg"],
-            "Peso": ["peso", "weight", "kg"],
-            "VALOR_DECLARADO": ["valor", "precio", "monto", "price"],
-            "valor_declarado": ["valor", "precio", "monto", "price"],
-            "Valor": ["valor", "precio", "monto", "price"],
-            "ALTO_CM": ["alto", "altura", "height"],
-            "ANCHO_CM": ["ancho", "width"],
-            "LARGO_CM": ["largo", "length", "profundidad"],
+        # Formatos requeridos por cada courier
+        FORMATOS_COURIER = {
+            "Starken": ["NOMBRE_DEST", "DIRECCION", "COMUNA_DEST", "CIUDAD_DEST", "FONO_DEST", "EMAIL_DEST", "DESC_CONTENIDO", "PESO_KG", "ALTO_CM", "ANCHO_CM", "LARGO_CM", "VALOR_DECLARADO"],
+            "Chilexpress": ["nombre_destinatario", "direccion_destino", "comuna_destino", "telefono_contacto", "email_contacto", "descripcion_producto", "peso_kg", "valor_declarado"],
+            "Blue Express": ["Destinatario", "Dirección", "Comuna", "Ciudad", "Teléfono", "Email", "Descripción", "Peso", "Valor"],
         }
 
-        mapeo = {}
-        cols_por_fila = 3
-        columnas_ui = [columnas_requeridas[i:i+cols_por_fila] for i in range(0, len(columnas_requeridas), cols_por_fila)]
+        courier = st.selectbox("Selecciona el courier", list(FORMATOS_COURIER.keys()), key="courier")
+        st.caption(f"Columnas requeridas por {courier}: `{'`, `'.join(FORMATOS_COURIER[courier])}`")
 
-        for fila in columnas_ui:
-            cols_st = st.columns(len(fila))
-            for j, campo in enumerate(fila):
-                keywords = KEYWORDS_COURIER.get(campo, [campo.lower()])
-                default = next(
-                    (c for c in df7.columns if any(k in c.lower() for k in keywords)),
-                    df7.columns[0]
-                )
-                with cols_st[j]:
-                    mapeo[campo] = st.selectbox(
-                        f"`{campo}`", df7.columns,
-                        index=list(df7.columns).index(default),
-                        key=f"courier_{campo}"
+        uploaded7 = st.file_uploader("Sube tu planilla de pedidos", type=["csv", "xlsx"], key="up7")
+
+        if uploaded7:
+            df7 = pd.read_csv(uploaded7) if uploaded7.name.endswith('.csv') else pd.read_excel(uploaded7)
+            st.success(f"✅ {len(df7):,} pedidos cargados")
+
+            with st.expander("👁️ Vista previa", expanded=False):
+                st.dataframe(df7.head(), use_container_width=True)
+
+            st.divider()
+            st.markdown(f"#### 🗂️ Mapea tus columnas al formato {courier}")
+            st.caption("Selecciona qué columna de tu archivo corresponde a cada campo requerido")
+
+            columnas_requeridas = FORMATOS_COURIER[courier]
+            KEYWORDS_COURIER = {
+                "NOMBRE_DEST": ["nombre", "name", "destinatario", "cliente"],
+                "nombre_destinatario": ["nombre", "name", "destinatario", "cliente"],
+                "Destinatario": ["nombre", "name", "destinatario", "cliente"],
+                "DIRECCION": ["direccion", "dirección", "address", "calle"],
+                "direccion_destino": ["direccion", "dirección", "address", "calle"],
+                "Dirección": ["direccion", "dirección", "address", "calle"],
+                "COMUNA_DEST": ["comuna", "city", "ciudad"],
+                "comuna_destino": ["comuna", "city", "ciudad"],
+                "Comuna": ["comuna", "city", "ciudad"],
+                "CIUDAD_DEST": ["ciudad", "city", "region"],
+                "Ciudad": ["ciudad", "city", "region"],
+                "FONO_DEST": ["telefono", "fono", "phone", "celular"],
+                "telefono_contacto": ["telefono", "fono", "phone", "celular"],
+                "Teléfono": ["telefono", "fono", "phone", "celular"],
+                "EMAIL_DEST": ["email", "correo", "mail"],
+                "email_contacto": ["email", "correo", "mail"],
+                "Email": ["email", "correo", "mail"],
+                "DESC_CONTENIDO": ["producto", "descripcion", "item", "contenido"],
+                "descripcion_producto": ["producto", "descripcion", "item", "contenido"],
+                "Descripción": ["producto", "descripcion", "item", "contenido"],
+                "PESO_KG": ["peso", "weight", "kg"],
+                "peso_kg": ["peso", "weight", "kg"],
+                "Peso": ["peso", "weight", "kg"],
+                "VALOR_DECLARADO": ["valor", "precio", "monto", "price"],
+                "valor_declarado": ["valor", "precio", "monto", "price"],
+                "Valor": ["valor", "precio", "monto", "price"],
+                "ALTO_CM": ["alto", "altura", "height"],
+                "ANCHO_CM": ["ancho", "width"],
+                "LARGO_CM": ["largo", "length", "profundidad"],
+            }
+
+            mapeo = {}
+            cols_por_fila = 3
+            columnas_ui = [columnas_requeridas[i:i+cols_por_fila] for i in range(0, len(columnas_requeridas), cols_por_fila)]
+
+            for fila in columnas_ui:
+                cols_st = st.columns(len(fila))
+                for j, campo in enumerate(fila):
+                    keywords = KEYWORDS_COURIER.get(campo, [campo.lower()])
+                    default = next(
+                        (c for c in df7.columns if any(k in c.lower() for k in keywords)),
+                        df7.columns[0]
                     )
+                    with cols_st[j]:
+                        mapeo[campo] = st.selectbox(
+                            f"`{campo}`", df7.columns,
+                            index=list(df7.columns).index(default),
+                            key=f"courier_{campo}"
+                        )
 
-        if st.button("📦 Generar archivo para courier", key="btn7"):
-            with st.spinner("Generando..."):
-                df_courier = pd.DataFrame()
-                for campo, col_origen in mapeo.items():
-                    df_courier[campo] = df7[col_origen]
+            if st.button("📦 Generar archivo para courier", key="btn7"):
+                with st.spinner("Generando..."):
+                    df_courier = pd.DataFrame()
+                    for campo, col_origen in mapeo.items():
+                        df_courier[campo] = df7[col_origen]
 
-            st.success(f"✅ Archivo listo para {courier}")
-            st.dataframe(df_courier, use_container_width=True)
+                st.success(f"✅ Archivo listo para {courier}")
+                st.dataframe(df_courier, use_container_width=True)
 
-            d1, d2 = st.columns(2)
-            with d1:
-                from io import BytesIO
-                buffer = BytesIO()
-                df_courier.to_excel(buffer, index=False, engine='openpyxl')
-                st.download_button(
-                    f"⬇️ Descargar Excel {courier}",
-                    buffer.getvalue(),
-                    f"pedidos_{courier.lower().replace(' ', '_')}.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True, type="primary"
-                )
-            with d2:
-                st.download_button(
-                    f"⬇️ Descargar CSV {courier}",
-                    df_courier.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
-                    f"pedidos_{courier.lower().replace(' ', '_')}.csv",
-                    "text/csv",
-                    use_container_width=True
-                )
+                d1, d2 = st.columns(2)
+                with d1:
+                    from io import BytesIO
+                    buffer = BytesIO()
+                    df_courier.to_excel(buffer, index=False, engine='openpyxl')
+                    st.download_button(
+                        f"⬇️ Descargar Excel {courier}",
+                        buffer.getvalue(),
+                        f"pedidos_{courier.lower().replace(' ', '_')}.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True, type="primary"
+                    )
+                with d2:
+                    st.download_button(
+                        f"⬇️ Descargar CSV {courier}",
+                        df_courier.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+                        f"pedidos_{courier.lower().replace(' ', '_')}.csv",
+                        "text/csv",
+                        use_container_width=True
+                    )
