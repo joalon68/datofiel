@@ -32,12 +32,14 @@ st.markdown("Limpia y normaliza tu base de datos chilena en segundos")
 st.divider()
 
 # ── Navegación por pestañas ────────────────────────────────────
-tab5, tab1, tab2, tab3, tab4 = st.tabs([
+tab5, tab1, tab2, tab3, tab4, tab6, tab7 = st.tabs([
     "🩺 Diagnóstico Gratuito",
     "🪪 RUT & Direcciones",
     "📱 Teléfonos",
     "📧 Emails",
     "💡 Inteligencia de Clientes",
+    "🔄 Conversor de Formatos",
+    "📦 Procesador de Pedidos",
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -667,3 +669,215 @@ with tab5:
 
             st.divider()
             st.info("💡 ¿Quieres corregir estos problemas? Usa las herramientas en las pestañas anteriores.")
+# ══════════════════════════════════════════════════════════════
+# PESTAÑA 6 — Conversor de Formatos
+# ══════════════════════════════════════════════════════════════
+with tab6:
+    st.subheader("🔄 Conversor de Formatos")
+    st.markdown("""
+    <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+        <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+            <div style='flex:1; min-width:200px'>
+                <p style='color:#cdd6f4'>Convierte entre CSV y Excel, cambia separadores y encodings. Ideal para compatibilizar archivos entre distintos sistemas.</p>
+                <p style='color:#a6adc8; font-size:0.85rem'>📄 CSV ↔ Excel &nbsp;|&nbsp; 🔤 Encoding UTF-8 / Latin &nbsp;|&nbsp; ⚙️ Separador personalizable</p>
+            </div>
+            <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#f38ba8'>❌ &nbsp;archivo.csv (separador ;)</div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ &nbsp;archivo.xlsx (sin tildes)</div>
+                <div style='color:#a6adc8; margin-top:6px'>↓ conversión instantánea ↓</div>
+                <div style='color:#a6e3a1; margin-top:6px'>✅ &nbsp;archivo.xlsx (con tildes)</div>
+                <div style='color:#a6e3a1; margin-top:6px'>✅ &nbsp;archivo.csv (separador ,)</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    uploaded6 = st.file_uploader("Sube tu archivo", type=["csv", "xlsx", "xls"], key="up6")
+
+    if uploaded6:
+        # Detectar tipo y leer
+        nombre = uploaded6.name
+        extension = nombre.split('.')[-1].lower()
+
+        if extension == 'csv':
+            # Detectar separador automáticamente
+            muestra = uploaded6.read(2048).decode('utf-8', errors='replace')
+            uploaded6.seek(0)
+            sep = ';' if muestra.count(';') > muestra.count(',') else ','
+            try:
+                df6 = pd.read_csv(uploaded6, sep=sep, encoding='utf-8')
+            except:
+                uploaded6.seek(0)
+                df6 = pd.read_csv(uploaded6, sep=sep, encoding='latin-1')
+        else:
+            df6 = pd.read_excel(uploaded6)
+
+        st.success(f"✅ {len(df6):,} registros — {len(df6.columns)} columnas detectadas")
+        st.caption(f"Separador detectado: `{sep}`" if extension == 'csv' else "Archivo Excel leído correctamente")
+
+        with st.expander("👁️ Vista previa", expanded=False):
+            st.dataframe(df6.head(), use_container_width=True)
+
+        st.divider()
+        st.markdown("#### ⚙️ Opciones de conversión")
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            formato_salida = st.selectbox("Formato de salida", ["Excel (.xlsx)", "CSV con coma (,)", "CSV con punto y coma (;)"], key="fmt_salida")
+        with c2:
+            encoding_salida = st.selectbox("Encoding", ["UTF-8 (recomendado)", "Latin-1 (Windows)"], key="fmt_enc")
+        with c3:
+            nombre_salida = st.text_input("Nombre del archivo", value=nombre.rsplit('.', 1)[0], key="fmt_nombre")
+
+        if st.button("🔄 Convertir", key="btn6"):
+            with st.spinner("Convirtiendo..."):
+                if formato_salida == "Excel (.xlsx)":
+                    from io import BytesIO
+                    buffer = BytesIO()
+                    df6.to_excel(buffer, index=False, engine='openpyxl')
+                    st.download_button("⬇️ Descargar Excel",
+                        buffer.getvalue(),
+                        f"{nombre_salida}.xlsx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True, type="primary")
+                else:
+                    sep_out = ',' if 'coma' in formato_salida else ';'
+                    enc_out = 'utf-8-sig' if 'UTF' in encoding_salida else 'latin-1'
+                    csv_out = df6.to_csv(index=False, sep=sep_out, encoding=enc_out).encode(enc_out)
+                    ext = 'csv'
+                    st.download_button("⬇️ Descargar CSV",
+                        csv_out,
+                        f"{nombre_salida}.{ext}",
+                        "text/csv",
+                        use_container_width=True, type="primary")
+
+            st.success("✅ Archivo listo para descargar")
+
+# ══════════════════════════════════════════════════════════════
+# PESTAÑA 7 — Procesador de Pedidos
+# ══════════════════════════════════════════════════════════════
+with tab7:
+    st.subheader("📦 Procesador de Pedidos")
+    st.markdown("""
+    <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+        <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+            <div style='flex:1; min-width:200px'>
+                <p style='color:#cdd6f4'>Transforma tu planilla de pedidos al formato exacto que requieren Starken, Chilexpress y Blue Express. Elimina el trabajo manual de reformatear datos para cada courier.</p>
+                <p style='color:#a6adc8; font-size:0.85rem'>🚚 Starken &nbsp;|&nbsp; 📬 Chilexpress &nbsp;|&nbsp; 💨 Blue Express &nbsp;|&nbsp; PDF + Excel</p>
+            </div>
+            <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#cdd6f4'>Tu planilla &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ Formato courier</div>
+                <div style='color:#a6adc8; margin-top:6px'>nombre &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ NOMBRE_DEST</div>
+                <div style='color:#a6adc8; margin-top:4px'>direccion &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ DIRECCION</div>
+                <div style='color:#a6adc8; margin-top:4px'>comuna &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ COMUNA_DEST</div>
+                <div style='color:#a6adc8; margin-top:4px'>telefono &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ FONO_DEST</div>
+                <div style='color:#a6adc8; margin-top:4px'>producto &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ DESC_CONTENIDO</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Formatos requeridos por cada courier
+    FORMATOS_COURIER = {
+        "Starken": ["NOMBRE_DEST", "DIRECCION", "COMUNA_DEST", "CIUDAD_DEST", "FONO_DEST", "EMAIL_DEST", "DESC_CONTENIDO", "PESO_KG", "ALTO_CM", "ANCHO_CM", "LARGO_CM", "VALOR_DECLARADO"],
+        "Chilexpress": ["nombre_destinatario", "direccion_destino", "comuna_destino", "telefono_contacto", "email_contacto", "descripcion_producto", "peso_kg", "valor_declarado"],
+        "Blue Express": ["Destinatario", "Dirección", "Comuna", "Ciudad", "Teléfono", "Email", "Descripción", "Peso", "Valor"],
+    }
+
+    courier = st.selectbox("Selecciona el courier", list(FORMATOS_COURIER.keys()), key="courier")
+    st.caption(f"Columnas requeridas por {courier}: `{'`, `'.join(FORMATOS_COURIER[courier])}`")
+
+    uploaded7 = st.file_uploader("Sube tu planilla de pedidos", type=["csv", "xlsx"], key="up7")
+
+    if uploaded7:
+        df7 = pd.read_csv(uploaded7) if uploaded7.name.endswith('.csv') else pd.read_excel(uploaded7)
+        st.success(f"✅ {len(df7):,} pedidos cargados")
+
+        with st.expander("👁️ Vista previa", expanded=False):
+            st.dataframe(df7.head(), use_container_width=True)
+
+        st.divider()
+        st.markdown(f"#### 🗂️ Mapea tus columnas al formato {courier}")
+        st.caption("Selecciona qué columna de tu archivo corresponde a cada campo requerido")
+
+        columnas_requeridas = FORMATOS_COURIER[courier]
+        KEYWORDS_COURIER = {
+            "NOMBRE_DEST": ["nombre", "name", "destinatario", "cliente"],
+            "nombre_destinatario": ["nombre", "name", "destinatario", "cliente"],
+            "Destinatario": ["nombre", "name", "destinatario", "cliente"],
+            "DIRECCION": ["direccion", "dirección", "address", "calle"],
+            "direccion_destino": ["direccion", "dirección", "address", "calle"],
+            "Dirección": ["direccion", "dirección", "address", "calle"],
+            "COMUNA_DEST": ["comuna", "city", "ciudad"],
+            "comuna_destino": ["comuna", "city", "ciudad"],
+            "Comuna": ["comuna", "city", "ciudad"],
+            "CIUDAD_DEST": ["ciudad", "city", "region"],
+            "Ciudad": ["ciudad", "city", "region"],
+            "FONO_DEST": ["telefono", "fono", "phone", "celular"],
+            "telefono_contacto": ["telefono", "fono", "phone", "celular"],
+            "Teléfono": ["telefono", "fono", "phone", "celular"],
+            "EMAIL_DEST": ["email", "correo", "mail"],
+            "email_contacto": ["email", "correo", "mail"],
+            "Email": ["email", "correo", "mail"],
+            "DESC_CONTENIDO": ["producto", "descripcion", "item", "contenido"],
+            "descripcion_producto": ["producto", "descripcion", "item", "contenido"],
+            "Descripción": ["producto", "descripcion", "item", "contenido"],
+            "PESO_KG": ["peso", "weight", "kg"],
+            "peso_kg": ["peso", "weight", "kg"],
+            "Peso": ["peso", "weight", "kg"],
+            "VALOR_DECLARADO": ["valor", "precio", "monto", "price"],
+            "valor_declarado": ["valor", "precio", "monto", "price"],
+            "Valor": ["valor", "precio", "monto", "price"],
+            "ALTO_CM": ["alto", "altura", "height"],
+            "ANCHO_CM": ["ancho", "width"],
+            "LARGO_CM": ["largo", "length", "profundidad"],
+        }
+
+        mapeo = {}
+        cols_por_fila = 3
+        columnas_ui = [columnas_requeridas[i:i+cols_por_fila] for i in range(0, len(columnas_requeridas), cols_por_fila)]
+
+        for fila in columnas_ui:
+            cols_st = st.columns(len(fila))
+            for j, campo in enumerate(fila):
+                keywords = KEYWORDS_COURIER.get(campo, [campo.lower()])
+                default = next(
+                    (c for c in df7.columns if any(k in c.lower() for k in keywords)),
+                    df7.columns[0]
+                )
+                with cols_st[j]:
+                    mapeo[campo] = st.selectbox(
+                        f"`{campo}`", df7.columns,
+                        index=list(df7.columns).index(default),
+                        key=f"courier_{campo}"
+                    )
+
+        if st.button("📦 Generar archivo para courier", key="btn7"):
+            with st.spinner("Generando..."):
+                df_courier = pd.DataFrame()
+                for campo, col_origen in mapeo.items():
+                    df_courier[campo] = df7[col_origen]
+
+            st.success(f"✅ Archivo listo para {courier}")
+            st.dataframe(df_courier, use_container_width=True)
+
+            d1, d2 = st.columns(2)
+            with d1:
+                from io import BytesIO
+                buffer = BytesIO()
+                df_courier.to_excel(buffer, index=False, engine='openpyxl')
+                st.download_button(
+                    f"⬇️ Descargar Excel {courier}",
+                    buffer.getvalue(),
+                    f"pedidos_{courier.lower().replace(' ', '_')}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True, type="primary"
+                )
+            with d2:
+                st.download_button(
+                    f"⬇️ Descargar CSV {courier}",
+                    df_courier.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+                    f"pedidos_{courier.lower().replace(' ', '_')}.csv",
+                    "text/csv",
+                    use_container_width=True
+                )
