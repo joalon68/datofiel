@@ -235,7 +235,82 @@ with tab2:
                 st.download_button("⬇️ CSV completo",
                     df2.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
                     "telefonos_completo.csv", "text/csv", use_container_width=True)
+# ══════════════════════════════════════════════════════════════
+# PESTAÑA 3 — Emails
+# ══════════════════════════════════════════════════════════════
+with tab3:
+    st.subheader("📧 Validación y Corrección de Emails")
 
+    TYPOS_DOMINIOS = {
+        "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gmail.con": "gmail.com",
+        "gmal.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",
+        "hotmial.com": "hotmail.com", "hotmal.com": "hotmail.com", "hotmail.con": "hotmail.com",
+        "hotmai.com": "hotmail.com", "homail.com": "hotmail.com",
+        "yahooo.com": "yahoo.com", "yaho.com": "yahoo.com", "yahoo.con": "yahoo.com",
+        "outlok.com": "outlook.com", "outlock.com": "outlook.com", "outlook.con": "outlook.com",
+    }
+
+    def validar_email_fn(email) -> dict:
+        email = str(email).strip().lower()
+        dominio = email.split('@')[-1] if '@' in email else ''
+        sugerido = None
+
+        if dominio in TYPOS_DOMINIOS:
+            sugerido = email.replace(dominio, TYPOS_DOMINIOS[dominio])
+
+        try:
+            v = validate_email(email, check_deliverability=False)
+            return {"valido": True, "email_corregido": sugerido or v.normalized, "corregido": sugerido is not None}
+        except EmailNotValidError:
+            return {"valido": False, "email_corregido": sugerido, "corregido": sugerido is not None}
+
+    uploaded3 = st.file_uploader("Sube tu archivo", type=["csv", "xlsx"], key="up3")
+
+    if uploaded3:
+        df3 = pd.read_csv(uploaded3) if uploaded3.name.endswith('.csv') else pd.read_excel(uploaded3)
+        st.success(f"✅ {len(df3):,} registros cargados")
+
+        with st.expander("👁️ Vista previa", expanded=False):
+            st.dataframe(df3.head(), use_container_width=True)
+
+        KEYWORDS_EMAIL = ["email", "correo", "mail", "e-mail", "e_mail"]
+        col_email_det = next(
+            (c for c in df3.columns if any(k in c.lower() for k in KEYWORDS_EMAIL)),
+            df3.columns[0]
+        )
+
+        st.markdown('**Columna de email** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
+        col_email = st.selectbox("", df3.columns, index=list(df3.columns).index(col_email_det), key="email", label_visibility="collapsed")
+
+        if st.button("📧 Validar Emails", key="btn3"):
+            with st.spinner("Procesando..."):
+                resultado              = df3[col_email].apply(validar_email_fn)
+                df3['email_corregido'] = resultado.apply(lambda x: x['email_corregido'])
+                df3['email_valido']    = resultado.apply(lambda x: x['valido'])
+                df3['email_corregido_flag'] = resultado.apply(lambda x: x['corregido'])
+
+            validos    = int(df3['email_valido'].sum())
+            invalidos  = len(df3) - validos
+            corregidos = int(df3['email_corregido_flag'].sum())
+
+            st.divider()
+            m1, m2, m3 = st.columns(3)
+            m1.metric("✅ Emails válidos",   validos)
+            m2.metric("❌ Emails inválidos", invalidos)
+            m3.metric("🔧 Typos corregidos", corregidos)
+
+            df3_vista = df3.drop(columns=['email_valido', 'email_corregido_flag'])
+            st.dataframe(df3_vista, use_container_width=True)
+
+            d1, d2 = st.columns(2)
+            with d1:
+                st.download_button("⬇️ CSV limpio",
+                    df3_vista.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+                    "emails_limpios.csv", "text/csv", use_container_width=True, type="primary")
+            with d2:
+                st.download_button("⬇️ CSV completo",
+                    df3.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig'),
+                    "emails_completo.csv", "text/csv", use_container_width=True)
 # ══════════════════════════════════════════════════════════════
 # PESTAÑA 4 — RFM Analytics
 # ══════════════════════════════════════════════════════════════
