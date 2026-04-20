@@ -45,6 +45,22 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # ══════════════════════════════════════════════════════════════
 with tab1:
     st.subheader("🪪 Limpieza de RUT, Direcciones y Comunas")
+    st.markdown("""
+    <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+        <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+            <div style='flex:1; min-width:200px'>
+                <p style='color:#cdd6f4'>Limpia y valida tus datos de contacto y facturación chilenos. Ideal para preparar bases de datos para el <strong>SII</strong>, logística y CRM.</p>
+                <p style='color:#a6adc8; font-size:0.85rem'>✅ Valida dígito verificador &nbsp;|&nbsp; 📍 Parsea direcciones &nbsp;|&nbsp; 🏙️ Corrige comunas &nbsp;|&nbsp; 🔍 Detecta duplicados</p>
+            </div>
+            <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#f38ba8'>❌ &nbsp;12.345.678-<b>0</b> &nbsp;→&nbsp; <span style='color:#a6e3a1'>✅ 12.345.678-9</span></div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ &nbsp;Santigo &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp; <span style='color:#a6e3a1'>✅ Santiago</span></div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ &nbsp;Av Italia 567 3 &nbsp;→&nbsp; <span style='color:#a6e3a1'>✅ Calle: Av. Italia</span></div>
+                <div style='color:#a6adc8; margin-top:6px'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Número: 567 | Depto: 3</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     KEYWORDS = {
         "rut":    ["rut", "run", "identificador", "id_fiscal", "tax_id"],
@@ -154,12 +170,29 @@ with tab1:
 # ══════════════════════════════════════════════════════════════
 with tab2:
     st.subheader("📱 Normalización de Teléfonos Chilenos")
+    st.markdown("""
+    <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+        <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+            <div style='flex:1; min-width:200px'>
+                <p style='color:#cdd6f4'>Convierte cualquier formato de número chileno a un estándar único. Compatible con bases de datos de CRM, WhatsApp masivo y call centers.</p>
+                <p style='color:#a6adc8; font-size:0.85rem'>📱 8 formatos de entrada soportados &nbsp;|&nbsp; 🇨🇱 Solo números chilenos &nbsp;|&nbsp; 📐 Formato de salida personalizable</p>
+            </div>
+            <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#f38ba8'>❌ &nbsp;9-8765-4321</div>
+                <div style='color:#f38ba8'>❌ &nbsp;56987654321</div>
+                <div style='color:#f38ba8'>❌ &nbsp;+569 8765 4321</div>
+                <div style='color:#f38ba8'>❌ &nbsp;987654321</div>
+                <div style='color:#a6adc8; margin-top:4px'>↓ todos se normalizan a ↓</div>
+                <div style='color:#a6e3a1; margin-top:4px'>✅ &nbsp;+56 9 8765 4321</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     def normalizar_telefono(numero) -> dict:
         import re
         numero = str(numero).strip()
         limpio = re.sub(r'[^\d]', '', numero)
-
         if len(limpio) == 9 and limpio.startswith('9'):
             limpio = '+56' + limpio
         elif len(limpio) == 10 and limpio.startswith('9'):
@@ -172,18 +205,28 @@ with tab2:
             limpio = '+569' + limpio
         else:
             limpio = '+56' + limpio
-
         try:
             parsed = phonenumbers.parse(limpio, "CL")
             valido = phonenumbers.is_possible_number(parsed)
             if valido:
-                formateado = phonenumbers.format_number(
-                    parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL
-                )
-                # Asegurar formato +56 9 XXXX XXXX
-                digitos = re.sub(r'[^\d]', '', formateado)
+                base = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+                digitos = re.sub(r'[^\d]', '', base)
                 if len(digitos) == 11 and digitos.startswith('569'):
-                    formateado = f"+56 {digitos[2]} {digitos[3:7]} {digitos[7:]}"
+                    d = digitos[3:]
+                    if formato_tel == "+56 9 XXXX XXXX":
+                        formateado = f"+56 9 {d[:4]} {d[4:]}"
+                    elif formato_tel == "9 XXXX XXXX":
+                        formateado = f"9 {d[:4]} {d[4:]}"
+                    elif formato_tel == "XXXX XXXX":
+                        formateado = f"{d[:4]} {d[4:]}"
+                    elif formato_tel == "XXXXXXXX":
+                        formateado = d
+                    elif formato_tel == "9XXXXXXXX":
+                        formateado = f"9{d}"
+                    else:
+                        formateado = base
+                else:
+                    formateado = base
             else:
                 formateado = None
             return {"valido": valido, "telefono_normalizado": formateado}
@@ -207,7 +250,14 @@ with tab2:
 
         st.markdown('**Columna de teléfono** <span class="tag tag-auto">✨ auto</span>', unsafe_allow_html=True)
         col_tel = st.selectbox("", df2.columns, index=list(df2.columns).index(col_tel_det), key="tel", label_visibility="collapsed")
-
+        st.markdown("#### 📐 Formato de salida")
+        formato_tel = st.radio("", [
+            "+56 9 XXXX XXXX",
+            "9 XXXX XXXX",
+            "XXXX XXXX",
+            "XXXXXXXX",
+            "9XXXXXXXX"
+        ], horizontal=True, key="formato_tel")
         if st.button("📱 Normalizar Teléfonos", key="btn2"):
             with st.spinner("Procesando..."):
                 resultado       = df2[col_tel].apply(normalizar_telefono)
@@ -240,6 +290,22 @@ with tab2:
 # ══════════════════════════════════════════════════════════════
 with tab3:
     st.subheader("📧 Validación y Corrección de Emails")
+    st.markdown("""
+    <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+        <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+            <div style='flex:1; min-width:200px'>
+                <p style='color:#cdd6f4'>Detecta y corrige errores tipográficos en dominios de email. Reduce rebotes en campañas de email marketing y mejora la tasa de entrega.</p>
+                <p style='color:#a6adc8; font-size:0.85rem'>🔧 Corrige typos en dominios &nbsp;|&nbsp; ✅ Valida formato &nbsp;|&nbsp; 📊 Reporta tasa de calidad</p>
+            </div>
+            <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#f38ba8'>❌ &nbsp;juan@<b>gmial</b>.com &nbsp;&nbsp;→&nbsp; <span style='color:#a6e3a1'>✅ juan@gmail.com</span></div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ &nbsp;ana@<b>hotmial</b>.com →&nbsp; <span style='color:#a6e3a1'>✅ ana@hotmail.com</span></div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ &nbsp;luis@<b>gmail.con</b> &nbsp;→&nbsp; <span style='color:#a6e3a1'>✅ luis@gmail.com</span></div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ &nbsp;bob@<b>outlok</b>.com &nbsp;→&nbsp; <span style='color:#a6e3a1'>✅ bob@outlook.com</span></div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     TYPOS_DOMINIOS = {
         "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gmail.con": "gmail.com",
@@ -316,6 +382,23 @@ with tab3:
 # ══════════════════════════════════════════════════════════════
 with tab4:
     st.subheader("📊 RFM Analytics — Inteligencia de Clientes")
+    st.markdown("""
+    <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+        <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+            <div style='flex:1; min-width:200px'>
+                <p style='color:#cdd6f4'>Transforma tu historial de ventas en inteligencia de clientes. Identifica automáticamente quiénes son tus mejores clientes y quiénes estás a punto de perder.</p>
+                <p style='color:#a6adc8; font-size:0.85rem'>📅 Recencia &nbsp;|&nbsp; 🔁 Frecuencia &nbsp;|&nbsp; 💰 Monto &nbsp;|&nbsp; Solo necesitas 3 columnas</p>
+            </div>
+            <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#a6e3a1'>🏆 Campeón &nbsp;&nbsp;→ Compra seguido, gasta mucho</div>
+                <div style='color:#89b4fa; margin-top:6px'>💛 Leal &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ Compra frecuente</div>
+                <div style='color:#a6e3a1; margin-top:6px'>🌱 Potencial &nbsp;→ Reciente, poco frecuente</div>
+                <div style='color:#f9e2af; margin-top:6px'>⚠️ En Riesgo &nbsp;→ No compra hace tiempo</div>
+                <div style='color:#f38ba8; margin-top:6px'>❌ Perdido &nbsp;&nbsp;&nbsp;→ Inactivo hace mucho</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.caption("Sube un historial de ventas y descubre quiénes son tus mejores clientes")
 
     uploaded4 = st.file_uploader("Sube tu archivo", type=["csv", "xlsx"], key="up4")
@@ -440,6 +523,24 @@ with tab4:
 # ══════════════════════════════════════════════════════════════
 with tab5:
     st.subheader("🩺 Diagnóstico Gratuito de tu Base de Datos")
+    st.markdown("""
+    <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
+        <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
+            <div style='flex:1; min-width:200px'>
+                <p style='color:#cdd6f4'>Sube tu base de datos y recibe en segundos un reporte completo de calidad. Sin costo, sin registro. Detecta automáticamente RUTs, emails, teléfonos y comunas.</p>
+                <p style='color:#a6adc8; font-size:0.85rem'>🆓 100% gratuito &nbsp;|&nbsp; ⚡ Resultado inmediato &nbsp;|&nbsp; 📋 Score de 0 a 100</p>
+            </div>
+            <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
+                <div style='color:#a6e3a1; font-size:1.5rem; text-align:center'>85/100</div>
+                <div style='color:#a6adc8; text-align:center; margin-bottom:8px'>Salud de Datos: Buena</div>
+                <div>🪪 RUTs válidos &nbsp;&nbsp;&nbsp;&nbsp;→ <span style='color:#a6e3a1'>92%</span></div>
+                <div style='margin-top:4px'>📧 Emails válidos &nbsp;&nbsp;→ <span style='color:#f9e2af'>78%</span></div>
+                <div style='margin-top:4px'>📱 Teléfonos &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span style='color:#f9e2af'>81%</span></div>
+                <div style='margin-top:4px'>🏙️ Comunas &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span style='color:#a6e3a1'>95%</span></div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.caption("Sube tu archivo y recibe un reporte de salud en segundos — sin costo")
 
     uploaded5 = st.file_uploader("Sube tu archivo", type=["csv", "xlsx"], key="up5")
