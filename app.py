@@ -454,24 +454,6 @@ with tab4:
         st.markdown("Regístrate y recibe **50 créditos** para empezar — sin tarjeta de crédito.")
         st.info("👈 Regístrate en el panel lateral")
     else:
-        st.subheader("💡 Inteligencia de Clientes")
-        st.markdown("""
-        <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
-            <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
-                <div style='flex:1; min-width:200px'>
-                    <p style='color:#cdd6f4'>Transforma tu historial de ventas en inteligencia de clientes. Identifica automáticamente quiénes son tus mejores clientes y quiénes estás a punto de perder.</p>
-                    <p style='color:#a6adc8; font-size:0.85rem'>📅 Recencia &nbsp;|&nbsp; 🔁 Frecuencia &nbsp;|&nbsp; 💰 Monto &nbsp;|&nbsp; Solo necesitas 3 columnas</p>
-                </div>
-                <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
-                <div style='color:#a6e3a1'>🏆 Campeón &nbsp;&nbsp;→ Compra seguido, gasta mucho</div>
-                <div style='color:#89b4fa; margin-top:6px'>💛 Leal &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ Compra frecuente</div>
-                <div style='color:#a6e3a1; margin-top:6px'>🌱 Potencial &nbsp;→ Reciente, poco frecuente</div>
-                <div style='color:#f9e2af; margin-top:6px'>⚠️ En Riesgo &nbsp;→ No compra hace tiempo</div>
-                <div style='color:#f38ba8; margin-top:6px'>❌ Perdido &nbsp;&nbsp;&nbsp;→ Inactivo hace mucho</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
         st.caption("Sube un historial de ventas y descubre quiénes son tus mejores clientes")
 
         uploaded4 = st.file_uploader("Sube tu archivo", type=["csv", "xlsx"], key="up4")
@@ -853,27 +835,6 @@ with tab7:
         st.markdown("Regístrate y recibe **50 créditos** para empezar — sin tarjeta de crédito.")
         st.info("👈 Regístrate en el panel lateral")
     else:
-        st.subheader("📦 Procesador de Pedidos")
-        st.markdown("""
-        <div style='background:#1e1e2e; border-radius:12px; padding:1.2rem; margin-bottom:1rem; border:1px solid #313244'>
-            <div style='display:flex; gap:2rem; align-items:center; flex-wrap:wrap'>
-                <div style='flex:1; min-width:200px'>
-                    <p style='color:#cdd6f4'>Transforma tu planilla de pedidos al formato exacto que requieren Starken, Chilexpress y Blue Express. Elimina el trabajo manual de reformatear datos para cada courier.</p>
-                    <p style='color:#a6adc8; font-size:0.85rem'>🚚 Starken &nbsp;|&nbsp; 📬 Chilexpress &nbsp;|&nbsp; 💨 Blue Express &nbsp;|&nbsp; PDF + Excel</p>
-                </div>
-                <div style='font-size:0.8rem; font-family:monospace; background:#181825; padding:1rem; border-radius:8px; min-width:260px'>
-                    <div style='color:#cdd6f4'>Tu planilla &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ Formato courier</div>
-                    <div style='color:#a6adc8; margin-top:6px'>nombre &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ NOMBRE_DEST</div>
-                    <div style='color:#a6adc8; margin-top:4px'>direccion &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ DIRECCION</div>
-                    <div style='color:#a6adc8; margin-top:4px'>comuna &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ COMUNA_DEST</div>
-                    <div style='color:#a6adc8; margin-top:4px'>telefono &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ FONO_DEST</div>
-                    <div style='color:#a6adc8; margin-top:4px'>producto &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ DESC_CONTENIDO</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Formatos requeridos por cada courier
         FORMATOS_COURIER = {
             "Starken": ["NOMBRE_DEST", "DIRECCION", "COMUNA_DEST", "CIUDAD_DEST", "FONO_DEST", "EMAIL_DEST", "DESC_CONTENIDO", "PESO_KG", "ALTO_CM", "ANCHO_CM", "LARGO_CM", "VALOR_DECLARADO"],
             "Chilexpress": ["nombre_destinatario", "direccion_destino", "comuna_destino", "telefono_contacto", "email_contacto", "descripcion_producto", "peso_kg", "valor_declarado"],
